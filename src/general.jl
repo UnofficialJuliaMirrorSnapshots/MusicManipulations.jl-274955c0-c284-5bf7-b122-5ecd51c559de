@@ -1,6 +1,6 @@
-export translate, transpose, randomnotes, subdivision
-export velocities, positions, pitches, durations
-import Base: transpose, +, -
+export translate, transpose, louden, randomnotes, subdivision
+export velocities, positions, pitches, durations, relpos
+export ▷, □, ◇
 
 velocities(notes::Notes) = [Int(x.velocity) for x in notes]
 positions(notes::Notes) = [Int(x.position) for x in notes]
@@ -31,6 +31,8 @@ end
 """
     translate(notes, ticks)
 Translate the `notes` for the given amount of `ticks`.
+
+The unicode symbol `▷` (`\\triangleright<tab>`) is equivalent to `translate`.
 """
 translate(notes::Notes, ticks) = Notes(translate(notes.notes, ticks), notes.tpq)
 translate(notes::Vector{N}, ticks) where {N<:AbstractNote} =
@@ -46,31 +48,58 @@ function translate!(notes::Notes, ticks)
     end
 end
 
-+(notes::Notes, x::Real) = translate(notes, round(Int, x))
--(notes::Notes, x::Real) = translate(notes, -round(Int, x))
-+(x::Real, notes::Notes) = notes + x
--(x::Real, notes::Notes) = notes - x
+▷ = translate
 
 """
     transpose(notes, semitones)
 Transpose the `notes` for the given amount of `semitones`.
+
+The unicode symbol `□` (`\\square`) is equivalent with `transpose`.
 """
-transpose(notes::Notes, semitones) = Notes(transpose(notes.notes, semitones), notes.tpq)
-transpose(notes::Vector{N}, semitones) where {N<:AbstractNote} =
+Base.transpose(notes::Notes, semitones) =
+Notes(transpose(notes.notes, semitones), notes.tpq)
+Base.transpose(notes::Vector{N}, semitones) where {N<:AbstractNote} =
 [Note(n.pitch + semitones, n.velocity, n.position, n.duration, n.channel) for n in notes]
 
-"""
-    subdivision(n::Int, tpq)
-Return how many ticks is the duration of
-the subdivision of a 4/4-bar into `n` equal parts, assuming the ticks per quarter
-note are `tpq`.
+□(notes::Notes, semitones) = transpose(notes, semitones)
+□(notes::Vector, semitones) = transpose(notes, semitones)
 
-For example, for sixteenth notes you would do `subdivision(16, tpq)`, for
-eigth-note triplets `subdivision(12, tpq)` and so on.
 """
+    louden(notes, v::Int)
+Increase the velocity of the notes by `v`.
+
+The unicode symbol `◇` (`\\mdlgwhtdiamond`) is equivalent with `louden`.
+"""
+louden(notes::Notes, semitones) =
+Notes(louden(notes.notes, semitones), notes.tpq)
+louden(notes::Vector{N}, semitones) where {N<:AbstractNote} =
+[Note(n.pitch, n.velocity + semitones, n.position, n.duration, n.channel) for n in notes]
+
+◇ = louden
+
 subdivision(n::Int, tpq)::Int = (4*tpq)/n
 
 function timesort(notes::Notes)
     issorted(notes, by = x -> x.position) && return notes
     return Notes(sort(notes.notes, by = x -> x.position), notes.tpq)
+end
+
+"""
+    relpos(notes::Notes, grid)
+Return the *relative* positions of the notes with respect to the current
+`grid`, i.e. all notes are brought within one quarter note.
+"""
+function relpos(notes::Notes, grid)
+    tpq = notes.tpq
+    c = (grid[end-1] + (1 - grid[end-1])/2) * tpq
+    rpos = zeros(Int, length(notes))
+    for (i, n) in enumerate(notes)
+        m = mod1(Int(n.position), tpq)
+        if m ≥ c
+            rpos[i] = m - tpq
+        else
+            rpos[i] = m
+        end
+    end
+    return rpos
 end
